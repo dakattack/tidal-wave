@@ -47,7 +47,6 @@ QString DiscordRPC::findDiscordSocketPath() {
 void DiscordRPC::onConnected() {
     qDebug() << "Connected to Discord IPC Socket. Sending authorization handshake...";
     
-    // Step 1: Execute Protocol Version 1 Handshake
     QJsonObject handshake;
     handshake["v"] = 1;
     handshake["client_id"] = m_clientId;
@@ -56,9 +55,8 @@ void DiscordRPC::onConnected() {
 }
 
 void DiscordRPC::onReadyRead() {
-    // Read response packet headers to verify handshake acknowledgment 
     if (!m_handshakeComplete) {
-        m_socket->readAll(); // Clear acknowledgment frame out of stream buffer
+        m_socket->readAll();
         m_handshakeComplete = true;
         qDebug() << "Discord Handshake complete! Pushing initial music frame...";
         
@@ -66,7 +64,7 @@ void DiscordRPC::onReadyRead() {
             updatePresence(m_pendingTrack, m_pendingArtist, m_pendingAlbumArt, m_playerPositionMs, m_playerDurationMs);
         }
     } else {
-        m_socket->readAll(); // Discard standard frame response echo logs
+        m_socket->readAll();
     }
 }
 
@@ -76,7 +74,6 @@ void DiscordRPC::sendPacket(quint32 opCode, const QJsonObject& jsonPayload) {
     QByteArray jsonBytes = QJsonDocument(jsonPayload).toJson(QJsonDocument::Compact);
     quint32 length = jsonBytes.length();
 
-    // Pack headers into Little Endian ordered binary stream segments
     QByteArray headerBytes;
     headerBytes.resize(8);
     memcpy(headerBytes.data(), &opCode, 4);
@@ -97,7 +94,6 @@ void DiscordRPC::updatePresence(const QString& trackTitle, const QString& artist
         return;
     }
 
-    // Build the specific Activity Schema used by the JavaScript application
     QJsonObject activity;
     activity["type"] = 2; // Type 2 maps to "Listening to..." natively on Discord
     activity["details"] = trackTitle;
@@ -106,10 +102,8 @@ void DiscordRPC::updatePresence(const QString& trackTitle, const QString& artist
     // CRUCIAL: Must be passed as a lower-case string over raw RPC sockets!
     activity["status_display_type"] = 1; 
 
-    // Optional Visual Assets
     QJsonObject assets;
     if (!albumArtUrl.isEmpty()) {
-        // If a valid URL is provided, pass the text string directly
         assets["large_image"] = albumArtUrl;
     } else {
         // Fallback to your developer portal asset key if no URL is available
@@ -120,14 +114,11 @@ void DiscordRPC::updatePresence(const QString& trackTitle, const QString& artist
 
     QJsonObject timestamps;
     
-    // Get the current local system epoch time in milliseconds
     qint64 currentEpochMs = QDateTime::currentMSecsSinceEpoch();
 
-    // Back-calculate the exact millisecond the song initially clicked "Play"
     qint64 startTimeMs = currentEpochMs - positionMs;
     timestamps["start"] = startTimeMs;
 
-    // Only apply the ending timestamp line if a valid track duration is resolved (> 0)
     if (durationMs > 0) {
         qint64 endTimeMs = startTimeMs + durationMs;
         timestamps["end"] = endTimeMs;
@@ -135,13 +126,12 @@ void DiscordRPC::updatePresence(const QString& trackTitle, const QString& artist
 
     activity["timestamps"] = timestamps;
 
-    // Wrap the activity structure into an RPC Command Object Payload
     QJsonObject args;
     args["pid"] = static_cast<int>(QCoreApplication::applicationPid());
     args["activity"] = activity;
 
     QJsonObject rootPayload;
-    rootPayload["cmd"] = QString("SET_ACTIVITY"); // Command label identifier
+    rootPayload["cmd"] = QString("SET_ACTIVITY");
     rootPayload["args"] = args;
     rootPayload["nonce"] = QString("1");
 
@@ -151,7 +141,6 @@ void DiscordRPC::updatePresence(const QString& trackTitle, const QString& artist
 void DiscordRPC::clearPresence() {
     if (!m_handshakeComplete) return;
 
-    // Send a SET_ACTIVITY frame with an omitted activity object to wipe it clean
     QJsonObject args;
     args["pid"] = static_cast<int>(QCoreApplication::applicationPid());
     args["activity"] = QJsonValue::Null;
