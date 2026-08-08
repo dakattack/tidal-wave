@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <numeric>
 #include <QRandomGenerator>
+#include <QElapsedTimer>
 #include <discord/DiscordRPC.h>
 
 Player::Player(TidalClient *client, QObject *parent)
@@ -46,39 +47,36 @@ void Player::initAudio() {
     connect(m_player, &QMediaPlayer::durationChanged,
             this, &Player::durationChanged);
     DiscordRPC* discordRPC = new DiscordRPC(this);
-    QTimer* discordHeartbeat = new QTimer(this);
-    discordHeartbeat->setInterval(2000);
+    auto lastPushTime = std::make_shared<QElapsedTimer>();
+    lastPushTime->start();
     // Global lambda to broadcast the presence without querying QMediaPlayer metrics
-    auto pushFreshPresenceFrame = [this, discordRPC]() {
+    auto pushFreshPresenceFrame = [this, discordRPC, lastPushTime](Track track) {
         // Fetch your structured tracking variable
-        const auto trackMap = this->currentTrackMap();
-        if (trackMap.isEmpty()) return; 
-        auto track = trackFromMap(trackMap);
-        QString title = track.title.isEmpty() ? QString("Unknown Track") : track.title;
-        QString artist = track.artists.isEmpty() ? QString("Unknown Artist") : track.artists.first().name;
-        QString albumArtUrl = track.coverUrl(1080).isEmpty() ? QString() : track.coverUrl(1080);
-        qint64 currentPosMs = m_player->position() > 0 ? m_player->position() : 0;
-        qint64 durationMs = track.duration > 0 ? track.duration * 1000 : 0;
-        discordRPC->updatePresence(title, artist, albumArtUrl, currentPosMs, durationMs);
-    };
-    connect(discordHeartbeat, &QTimer::timeout, this, [this, pushFreshPresenceFrame]() {
-        if (m_player->playbackState() == QMediaPlayer::PlayingState) {
-            pushFreshPresenceFrame();
+        if (track.id == 0) return;
+        if (lastPushTime->elapsed() >= 1000) {
+            title = track.title.isEmpty() ? QString("Unknown Track") : track.title;
+            artist = track.artists.isEmpty() ? QString("Unknown Artist") : track.artists.first().name;
+            albumArtUrl = track.coverUrl(1080).isEmpty() ? QString() : track.coverUrl(1080);
+            currentPosMs = m_player->position() > 0 ? m_player->position() : 0;
+            durationMs = track.duration > 0 ? track.duration * 1000 : 0;
+            discordRPC->updatePresence(title, artist, albumArtUrl, currentPosMs, durationMs);
+            lastPushTime->restart();
         }
+    };
+    connect(m_player, &QMediaPlayer::sourceChanged, this, [this, pushFreshPresenceFrame]() {
+        pushFreshPresenceFrame(m_currentTrack);
     });
-    connect(m_player, &QMediaPlayer::sourceChanged, this, [pushFreshPresenceFrame]() {
-        pushFreshPresenceFrame();
-    });
-    connect(m_player, &QMediaPlayer::playbackStateChanged, this, [this, discordHeartbeat, discordRPC, pushFreshPresenceFrame](QMediaPlayer::PlaybackState state) {
+    connect(m_player, &QMediaPlayer::playbackStateChanged, this, [this, discordRPC, pushFreshPresenceFrame](QMediaPlayer::PlaybackState state) {
         if (state == QMediaPlayer::PlayingState) {
             // Song resumed: Sync the layout with Discord once, then disconnect the pipeline from the stream
-            discordHeartbeat->start();
-            pushFreshPresenceFrame();
+            pushFreshPresenceFrame(m_currentTrack);
         } else {
             // Paused/Stopped: Instantly clear out the presence without probing stream properties
-            discordHeartbeat->stop();
             discordRPC->clearPresence();
         }
+    });
+    connect(m_player, &QMediaPlayer::positionChanged, this, [this, pushFreshPresenceFrame]() {
+        pushFreshPresenceFrame(m_currentTrack);
     });
 }
 

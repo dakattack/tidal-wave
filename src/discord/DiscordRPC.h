@@ -1,4 +1,5 @@
 #pragma once
+#include "Player.h"
 #include <QObject>
 #include <QLocalSocket>
 #include <QJsonObject>
@@ -32,4 +33,6 @@ private:
     QString m_pendingAlbumArt;
     qint64 m_playerPositionMs{0};
     qint64 m_playerDurationMs{0};
+
+    Track current_track;
 };

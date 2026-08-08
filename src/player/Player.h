@@ -172,4 +172,9 @@ private:
     QString              m_preloadQuality;
     QTemporaryFile      *m_preloadTempFile = nullptr;
     QNetworkReply       *m_preloadDownload = nullptr;
+    QString              title             = "";
+    QString              artist            = "";
+    QString              albumArtUrl       = "";
+    qint64               currentPosMs      = 0;
+    qint64               durationMs        = 0;
 };
