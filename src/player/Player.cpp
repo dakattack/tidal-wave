@@ -53,7 +53,6 @@ void Player::initAudio() {
     auto pushFreshPresenceFrame = [this, discordRPC, lastPushTime](Track track) {
         // Fetch your structured tracking variable
         if (track.id == 0) return;
-        if (lastPushTime->elapsed() >= 1000) {
             title = track.title.isEmpty() ? QString("Unknown Track") : track.title;
             artist = track.artists.isEmpty() ? QString("Unknown Artist") : track.artists.first().name;
             albumArtUrl = track.coverUrl(1080).isEmpty() ? QString() : track.coverUrl(1080);
@@ -61,7 +60,6 @@ void Player::initAudio() {
             durationMs = track.duration > 0 ? track.duration * 1000 : 0;
             discordRPC->updatePresence(title, artist, albumArtUrl, currentPosMs, durationMs);
             lastPushTime->restart();
-        }
     };
     connect(m_player, &QMediaPlayer::sourceChanged, this, [this, pushFreshPresenceFrame]() {
         pushFreshPresenceFrame(m_currentTrack);
@@ -75,8 +73,10 @@ void Player::initAudio() {
             discordRPC->clearPresence();
         }
     });
-    connect(m_player, &QMediaPlayer::positionChanged, this, [this, pushFreshPresenceFrame]() {
-        pushFreshPresenceFrame(m_currentTrack);
+    connect(m_player, &QMediaPlayer::positionChanged, this, [this, lastPushTime, pushFreshPresenceFrame]() {
+        if (lastPushTime->elapsed() >= 1000) {
+            pushFreshPresenceFrame(m_currentTrack);
+        }
     });
 }
 
