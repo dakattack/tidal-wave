@@ -64,6 +64,7 @@ if(UNIX AND NOT APPLE)
         src/cast/CastMediaServer.cpp
         src/cast/CastMediaPrep.cpp
         src/cast/CastManager.cpp
+        src/discord/DiscordRPC.cpp
     )
     list(APPEND HEADERS
         src/cast/CastMessage.h
@@ -72,6 +73,7 @@ if(UNIX AND NOT APPLE)
         src/cast/CastMediaServer.h
         src/cast/CastMediaPrep.h
         src/cast/CastManager.h
+        src/discord/DiscordRPC.h
     )
 endif()
 
