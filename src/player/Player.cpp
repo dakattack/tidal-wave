@@ -64,6 +64,9 @@ void Player::initAudio() {
     connect(m_player, &QMediaPlayer::sourceChanged, this, [this, pushFreshPresenceFrame]() {
         pushFreshPresenceFrame(m_currentTrack);
     });
+    connect(this, &Player::currentTrackChanged, this, [this, pushFreshPresenceFrame]() {
+        pushFreshPresenceFrame(m_currentTrack);
+    });
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, [this, discordRPC, pushFreshPresenceFrame](QMediaPlayer::PlaybackState state) {
         if (state == QMediaPlayer::PlayingState) {
             // Song resumed: Sync the layout with Discord once, then disconnect the pipeline from the stream
@@ -74,7 +77,7 @@ void Player::initAudio() {
         }
     });
     connect(m_player, &QMediaPlayer::positionChanged, this, [this, lastPushTime, pushFreshPresenceFrame]() {
-        if (lastPushTime->elapsed() >= 1000) {
+        if (lastPushTime->elapsed() >= 100) {
             pushFreshPresenceFrame(m_currentTrack);
         }
     });
